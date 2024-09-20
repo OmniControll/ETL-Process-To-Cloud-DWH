@@ -1,4 +1,5 @@
-The **Snowflake ETL Pipeline** is a Python-based application designed to streamline the process of extracting data, transforming it, and loading it into a Snowflake data warehouse. This project uses Pandas for data manipulation, SQLAlchemy for database interactions, and dotenv for secure management of environment variables.
+**Snowflake ETL Pipeline** is a Python script designed to streamline the process of extracting data, transforming it, and loading it into a Snowflake data warehouse.
+This project uses Pandas for data manipulation, SQLAlchemy for database interactions, and dotenv for secure management of environment variables.
 It ensures a secure, efficient, and automated data integration workflow, making it easier to manage and analyze large datasets.
 
 ## Features
