@@ -1,5 +1,5 @@
 import pandas as pd
-from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData
+from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData, text
 from sqlalchemy.exc import SQLAlchemyError
 import os
 from dotenv import load_dotenv
@@ -102,17 +102,19 @@ def load(data, table_name='train_table'):
         # Create SQLAlchemy engine for Snowflake
         engine = create_engine(connection_url)
 
-        # Establish connection
+# Establish connection
         with engine.connect() as connection:
             # Create the database if it doesn't exist
-            connection.execute(f"CREATE OR REPLACE DATABASE {database};")
+            create_db_query = f"CREATE OR REPLACE DATABASE {database};"
+            connection.execute(text(create_db_query))
             logging.info(f"Database '{database}' ensured in Snowflake.")
 
             # Switch to the newly created database
-            connection.execute(f"USE DATABASE {database};")
+            use_db_query = f"USE DATABASE {database};"
+            connection.execute(text(use_db_query))
             logging.info(f"Using database '{database}'.")
 
-            # Create the table schema if it doesn't exist
+            # Define the table schema (if it doesn't exist)
             train_table = Table(
                 table_name, metadata,
                 Column('ID', Integer, primary_key=True, nullable=False),
