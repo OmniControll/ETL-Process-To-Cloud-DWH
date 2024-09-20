@@ -1,17 +1,17 @@
-**Snowflake ETL Pipeline** is a Python script designed to streamline the process of extracting data, transforming it, and loading it into a Snowflake data warehouse.
+**Snowflake ETL Pipeline** is a Python script with the process of extracting data, transforming it, and loading it into a Snowflake data warehouse.
 This project uses Pandas for data manipulation, SQLAlchemy for database interactions, and dotenv for secure management of environment variables.
 It ensures a secure, efficient, and automated data integration workflow, making it easier to manage and analyze large datasets.
 
 ## Features
 
-- **Extract:** Gathers data from predefined sources and structures it into a Pandas DataFrame.
-- **Transform:** Cleans and transforms the extracted data by removing duplicates and handling missing values.
-- **Load:** Inserts the transformed data into Snowflake, with dynamic creation of databases and tables if they don't exist.
+- **Extract:** Gathers data from predefined sources and structures it into a Pandas DataFrame
+- **Transform:** Cleans and transforms the extracted data by removing duplicates and handling missing values
+- **Load:** Inserts the transformed data into Snowflake, with dynamic creation of databases and tables if they don't exist
 
-- **Dynamic Database and Table Creation:** Automatically creates the target database and table schema in Snowflake.
-- **Secure Credential Management:** Utilizes environment variables to manage sensitive Snowflake credentials securely.
-- **Comprehensive Logging:** Implements logging to monitor the ETL process and capture errors effectively.
-- **Error Handling:** Robust error handling to manage and log SQLAlchemy and general exceptions.
+- ** Database and Table Creation:** Automatically creates the target database and table schema in Snowflake.
+- ** Credential Management:** environment variables to manage Snowflake credentials .
+- ** Logging:** Implements logging to monitor the ETL process and capture errors .
+- **Error Handling:**  error handling to manage and log SQLAlchemy and general exceptions.
 
 ## Prerequisites
 
