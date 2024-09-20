@@ -42,3 +42,6 @@ bld/
 *.dbmdl
 *.bak
 *.backup
+
+#.env file
+.env

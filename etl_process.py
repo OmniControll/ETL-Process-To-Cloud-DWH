@@ -1,10 +1,23 @@
 import pandas as pd
 from sqlalchemy import create_engine, Table, Column, Integer, String, MetaData
+from sqlalchemy.exc import SQLAlchemyError
+import os
+from dotenv import load_dotenv
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Load environment variables from a .env file if you're using one
+load_dotenv()
 
 def extract():
-    #EXTRACT PHASE
-    # this is the data we want to load into the data warehouse or sql server, we can use this function also to connect to API's or other data sources.
-
+    """
+    EXTRACT PHASE
+    Extracts data to be loaded into the data warehouse or SQL server
+    This function can also connect to APIs or other data sources
+    
+    """
     data = pd.DataFrame({
         'ID': [1, 2, 3, 4, 5, 6, 7, 8],
         'Warehouse_block': ['D', 'F', 'A', 'B', 'C', 'F', 'D', 'F'],
@@ -19,67 +32,146 @@ def extract():
         'Weight_in_gms': [1233, 3088, 3374, 1177, 2484, 1417, 2371, 2804],
         'Reached_on_Time_Y_N': [1, 1, 1, 1, 1, 1, 1, 1]
     })
+    logging.info("Data extracted successfully.")
     return data
+
+def validate_data(data):
+    """
+    VALIDATE PHASE
+    Validates the transformed data to ensure it meets the required criteria before loading
+    """
+    required_columns = ['ID', 'Warehouse_block', 'Mode_of_Shipment', 'Customer_care_calls', 
+                        'Customer_rating', 'Cost_of_the_Product', 'Prior_purchases', 
+                        'Product_importance', 'Gender', 'Discount_offered', 
+                        'Weight_in_gms', 'Reached_on_Time_Y_N']
+    
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    # Additional validations can be added here, such as data type checks
+    logging.info("Data validation passed.")
 
 def transform(data):
-
-    # TRANSFORM PHASE
-    # Clean the extracted data by removing duplicates and handling missing values. we perform some transformations on the data here
-
+    """
+    TRANSFORM PHASE
+    Cleans the extracted data by removing duplicates and handling missing values
+    Performs necessary transformations on the data
+    
+    """
+    data = data.copy()  # To avoid SettingWithCopyWarning
+    initial_count = len(data)
     data.drop_duplicates(inplace=True)
+    duplicates_removed = initial_count - len(data)
+    if duplicates_removed > 0:
+        logging.info(f"Removed {duplicates_removed} duplicate rows.")
     data.fillna(method='ffill', inplace=True)
+    logging.info("Data transformed successfully.")
     return data
 
-def load(data):
-    #LOAD PHASE
-    #Insert the transformed data into a SQLite database. # we can also specify to connect to a data warehouse here, or on premise server
+def load(data, table_name='train_table'):
+    """
+    LOAD PHASE
+    Inserts the transformed data into a Snowflake data warehouse.
+    
+    """
+    # Snowflake connection parameters
+    user = os.getenv('SNOWFLAKE_USER')          # Snowflake username
+    password = os.getenv('SNOWFLAKE_PASSWORD')  # Snowflake password
 
-    # Connection parameters
-    db_path = 'train_data.db'  #  database file
-    table_name = 'train_table'  # Target table name
+    # Check if credentials are available
+    if not user or not password:
+        raise ValueError("Snowflake credentials not set in environment variables.") #ensures that the credentials are entered in the env file
 
-    # create an engine to conn
-    engine = create_engine(f'sqlite:///{db_path}')
+    account = 'immwogi-ni84898'                  # Snowflake account identifier
+    warehouse = 'COMPUTE_WH'                     # Snowflake warehouse
+    database = 'SHIP_DATABASE'                   # Target database
+    schema = 'PUBLIC'                            # Target schema
+    role = 'SYSADMIN'                            # Role
 
-
-    # Define metadata
-    metadata = MetaData()
-
-    # Define  schema
-    train_table = Table(
-        table_name, metadata,
-        Column('ID', Integer, primary_key=True, nullable=False),
-        Column('Warehouse_block', String),
-        Column('Mode_of_Shipment', String),
-        Column('Customer_care_calls', Integer),
-        Column('Customer_rating', Integer),
-        Column('Cost_of_the_Product', Integer),
-        Column('Prior_purchases', Integer),
-        Column('Product_importance', String),
-        Column('Gender', String),
-        Column('Discount_offered', Integer),
-        Column('Weight_in_gms', Integer),
-        Column('Reached_on_Time_Y_N', Integer)  # Renamed to avoid dots
+    # Construct the Snowflake SQLAlchemy connection URL
+    connection_url = (
+        f'snowflake://{user}:{password}@{account}/'
+        f'{database}/{schema}?warehouse={warehouse}&role={role}'
     )
 
-    # Create table if it doesn't exist
-    metadata.create_all(engine)
+    # Initialize metadata
+    metadata = MetaData()
 
-    # Load data into  table
-    data.to_sql(table_name, engine, if_exists='replace', index=False)
+    try:
+        # Create SQLAlchemy engine for Snowflake
+        engine = create_engine(connection_url)
+
+        # Establish connection
+        with engine.connect() as connection:
+            # Create the database if it doesn't exist
+            connection.execute(f"CREATE OR REPLACE DATABASE {database};")
+            logging.info(f"Database '{database}' ensured in Snowflake.")
+
+            # Switch to the newly created database
+            connection.execute(f"USE DATABASE {database};")
+            logging.info(f"Using database '{database}'.")
+
+            # Create the table schema if it doesn't exist
+            train_table = Table(
+                table_name, metadata,
+                Column('ID', Integer, primary_key=True, nullable=False),
+                Column('Warehouse_block', String),
+                Column('Mode_of_Shipment', String),
+                Column('Customer_care_calls', Integer),
+                Column('Customer_rating', Integer),
+                Column('Cost_of_the_Product', Integer),
+                Column('Prior_purchases', Integer),
+                Column('Product_importance', String),
+                Column('Gender', String),
+                Column('Discount_offered', Integer),
+                Column('Weight_in_gms', Integer),
+                Column('Reached_on_Time_Y_N', Integer)
+            )
+            metadata.create_all(engine)
+            logging.info(f"Table '{table_name}' ensured in Snowflake.")
+
+            # Insert data into Snowflake table
+            data.to_sql(
+                name=table_name,
+                con=connection,
+                if_exists='append',  # Options: 'fail', 'replace', 'append'
+                index=False,
+                method='multi'       # Optimizes insertion by batching
+            )
+        
+        logging.info(f"Data successfully loaded into Snowflake table '{table_name}'.")
+
+    except SQLAlchemyError as e:
+        # Handle SQLAlchemy-specific errors
+        logging.error("An error occurred while loading data to Snowflake:")
+        logging.error(e)
+    except Exception as ex:
+        # Handle other exceptions
+        logging.error("An unexpected error occurred:")
+        logging.error(ex)
 
 def main():
-       # Main Function:
-        #Orchestrates the ETL process by calling extract, transform, and load functions sequentially.
+    """
+    Main Function:
+    Orchestrates the ETL process
+    """
+    try:
+        # EXTRACT
+        data = extract()
 
-    #EXTRACT
-    data = extract()
+        # TRANSFORM
+        transformed_data = transform(data)
 
-    #TRANSFORM
-    transformed_data = transform(data)
+        # VALIDATE
+        validate_data(transformed_data)
 
-    #LOAD
-    load(transformed_data)
+        # LOAD
+        load(transformed_data, table_name='train_table')
+
+    except Exception as e:
+        logging.critical("ETL process failed:")
+        logging.critical(e)
 
 if __name__ == "__main__":
     main()
