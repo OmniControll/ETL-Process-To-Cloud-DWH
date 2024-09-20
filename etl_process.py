@@ -8,7 +8,7 @@ import logging
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Load environment variables from a .env file if you're using one
+# Load environment variables from a .env
 load_dotenv()
 
 def extract():
