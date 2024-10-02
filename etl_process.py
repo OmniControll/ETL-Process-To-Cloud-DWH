@@ -49,27 +49,32 @@ def extract(chunk_size=1000):
 
 #we're creating an  function here to validate the data we've received from the source.
 #This function will check if the data has all the required columns and if the data types are correct.
-def validate_data(data):
+def validate_data(chunked_data):
     """
     VALIDATE PHASE
-    Validates the transformed data to ensure it meets the required criteria before loading
+    Validates each chunk of data to ensure it meets the required criteria before loading.
     """
     required_columns = ['ID', 'Warehouse_block', 'Mode_of_Shipment', 'Customer_care_calls', 
                         'Customer_rating', 'Cost_of_the_Product', 'Prior_purchases', 
                         'Product_importance', 'Gender', 'Discount_offered', 
                         'Weight_in_gms', 'Reached_on_Time_Y_N']
     
-    missing_columns = [col for col in required_columns if col not in data.columns]
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
-    
-    # Additional validations can be added here, such as data type checks
-    logging.info("Data validation passed.")
+    for chunk in chunked_data:
+        # Check for missing columns in the current chunk
+        missing_columns = [col for col in required_columns if col not in chunk.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+        
+        # Additional validations can be added here for each chunk, such as data type checks
+        logging.info(f"Data validation passed for chunk with {len(chunk)} rows.")
+        
+        # Yield the validated chunk to continue the ETL process
+        yield chunk
 
 
 #This function will clean the data by removing duplicates and handling missing values. Obviously, we can add more transformation steps here
 #such as feature engineering, normalization, etc. based on the requirements of the project.
-def transform(data):
+def transform(chunked_data):
 
     # """
     # TRANSFORM PHASE
@@ -78,22 +83,20 @@ def transform(data):
     
     # """
 
-    data = data.copy()  # To avoid SettingWithCopyWarning
-    initial_count = len(data)
-    data.drop_duplicates(inplace=True)
-    duplicates_removed = initial_count - len(data)
-    if duplicates_removed > 0:
-        logging.info(f"Removed {duplicates_removed} duplicate rows.")
-    data.fillna(method='ffill', inplace=True)
+    for chunk in chunked_data:
+        chunk = chunk.drop_duplicates()
+        chunk.fillna(method='ffill', inplace=True)
+        yield chunk #returning transformed chunk of data
+
+
     logging.info("Data transformed successfully.")
-    return data
 
 
 #This function will load the transformed data into the data warehouse. In this case, we are using Snowflake as the target data warehouse.
 #We first establish a connection to Snowflake using SQLAlchemy and then create a table in the database if it doesn't exist.
 #Finally, we insert the transformed data into the table.
 
-def load(data, table_name='train_table'):
+def load(chunked_data, table_name='train_table'):
 
     # """
     # LOAD PHASE
@@ -163,17 +166,17 @@ def load(data, table_name='train_table'):
             metadata.create_all(engine)
             logging.info(f"Table '{table_name}' ensured in Snowflake.")
 
-            # Insert data into Snowflake table
-            data.to_sql(
-                name=table_name,
-                con=connection,
-                if_exists='append',  # Options: 'fail', 'replace', 'append'
-                index=False,
-                method='multi'       # Optimizes insertion by batching
-            )
-        
-        logging.info(f"Data successfully loaded into Snowflake table '{table_name}'.")
-
+            # Insert data into Snowflake table (chunked)
+            for chunk in chunked_data:
+                chunk.to_sql(
+                    name=table_name,
+                    con=connection,
+                    if_exists='append', # we apopend the data, not overwrite it
+                    index=False,
+                    method='multi' # we batch insert to optimize
+                )
+                logging.info(f"Data successfully loaded into Snowflake table '{table_name}'.")
+                             
     except SQLAlchemyError as e:
         # Handle SQLAlchemy-specific errors
         logging.error("An error occurred while loading data to Snowflake:")
