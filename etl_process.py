@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Load environment variables from a .env
 load_dotenv()
 
-def extract():
+def extract(chunk_size=1000):
     # 
     # EXTRACT PHASE
     # Extracts data to be loaded into the data warehouse or SQL server
@@ -34,6 +34,16 @@ def extract():
         'Weight_in_gms': [1233, 3088, 3374, 1177, 2484, 1417, 2371, 2804],
         'Reached_on_Time_Y_N': [1, 1, 1, 1, 1, 1, 1, 1]
     })
+
+
+    #ok, so instead of reading it all at once, imagine you have a large dataset, we will implement lazy loading 
+    #by reading the data in chunks. This is useful when working with large datasets that can't fit into memory.
+
+    #for now we will simulate chunking , which can be replaced with actual file reading logic
+    num_rows = data.shape[0]
+    for i in range(0, num_rows, chunk_size):
+        yield data.iloc[i:i + chunk_size] #here we get the chunk of data to load
+
     logging.info("Data extracted successfully.")
     return data
 
